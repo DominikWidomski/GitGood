@@ -102,6 +102,7 @@ const filterWTFiles = statusFiles => {
 	});
 }
 
+// I think there is specifically an issue with this with the output buffer
 const showStatus = (statusFiles) => {
 	console.log("STAGED");
 	outputFiles(filterIndexedFiles(statusFiles));
@@ -113,7 +114,7 @@ const showStatus = (statusFiles) => {
 const getWorkingDirFiles = statusFiles => {
 	return inquirer.prompt([
 		{
-			message: "Which file?",
+			message: "Which working dir file?",
 			// type: "list",
 			type: "checkbox",
 			name: "files",
@@ -129,7 +130,7 @@ const getWorkingDirFiles = statusFiles => {
 const getStagedFiles = statusFiles => {
 	return inquirer.prompt([
 		{
-			message: "Which file?",
+			message: "Which staged file?",
 			// type: "list",
 			type: "checkbox",
 			name: "files",
@@ -247,9 +248,11 @@ async function main2() {
 			}
 			
 			for(const statusFile of files) {
-				const result = await index.removeByPath(statusFile.path());
-			};
-			
+				const headRef = await nodegit.Reference.nameToId(repo, "HEAD");
+				const headCommit = await repo.getCommit(headRef);
+				const result = await nodegit.Reset.default(repo, headCommit, statusFile.path());
+			}
+
 			await index.write();
 		} else if (action === "commit") {
 			const oid = await index.writeTree();
