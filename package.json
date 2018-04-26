@@ -1,0 +1,22 @@
+{
+  "name": "gid",
+  "version": "0.0.1",
+  "description": "Git helper",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "git",
+    "helper",
+    "node"
+  ],
+  "author": "Dominik Widomski",
+  "license": "MIT",
+  "devDependencies": {
+    "simple-git": "^1.77.0"
+  },
+  "dependencies": {
+    "nodegit": "^0.22.0"
+  }
+}
