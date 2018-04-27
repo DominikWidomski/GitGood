@@ -2,6 +2,13 @@
 
 const Table = require('cli-table2');
 const inquirer = require('inquirer');
+const readline = require('readline');
+
+// proxy clearScreenDown
+const _clearScreenDown = readline.clearScreenDown;
+readline.clearScreenDown = function(...args) {
+	_clearScreenDown(...args);
+}
 
 process
   .on('unhandledRejection', (reason, p) => {
@@ -12,6 +19,17 @@ process
     process.exit(1);
   });
 
+const rl = readline.createInterface({
+	input: process.stdin,
+	output: process.stdout
+});
+
+const clearScreen = () => {
+	readline.cursorTo(rl, 0, 0);
+	// readline.moveCursor(rl, 0, -this.buffer.length);
+	readline.clearScreenDown(rl);
+};
+  
 /**
  * Objective:
  * I'd like to be able to see the history of a file, what lines were changed in which commit etc.
@@ -36,32 +54,38 @@ process
 
 const mapStatus = status => ({
 	CURRENT: 'current',
-	INDEX_NEW: 'in index - new',
-	INDEX_MODIFIED: 'in index - modified',
-	INDEX_DELETED: 'in index - deleted',
-	INDEX_RENAMED: 'in index - renamed',
-	INDEX_TYPECHANGE: 'in index - typechange',
-	WT_NEW: 'working dir - new',
-	WT_MODIFIED: 'working dir - modified',
-	WT_DELETED: 'working dir - deleted',
-	WT_TYPECHANGE: 'working dir - typechange',
-	WT_RENAMED: 'working dir - renamed',
-	WT_UNREADABLE: 'working dir - unreadable',
+	INDEX_NEW: 'new (i)',
+	INDEX_MODIFIED: 'modified (i)',
+	INDEX_DELETED: 'deleted (i)',
+	INDEX_RENAMED: 'renamed (i)',
+	INDEX_TYPECHANGE: 'typechange (i)',
+	WT_NEW: 'new (wt)',
+	WT_MODIFIED: 'modified (wt)',
+	WT_DELETED: 'deleted (wt)',
+	WT_TYPECHANGE: 'typechange (wt)',
+	WT_RENAMED: 'renamed (wt)',
+	WT_UNREADABLE: 'unreadable (wt)',
 	IGNORED: 'ignored',
 	CONFLICTED: 'conflicted',
 }[status]);
 
 const outputFiles = statusFiles => {
-	const table = new Table({
-		head: ['status', 'file']
-	});
+	const head = ['status', 'file'];
+	const table = new Table({ head });
 	
-	statusFiles.forEach(statusFile => {
-		table.push([
-			mapStatus(statusFile.status()),
-			statusFile.path()
-		]);
-	});
+	if (statusFiles.length) {
+		statusFiles.forEach(statusFile => {
+			table.push([
+				mapStatus(statusFile.status()),
+				statusFile.path()
+			]);
+		});
+	} else {
+		table.push([{
+			colSpan: head.length,
+			content: 'No files'
+		}])
+	}
 	
 	console.log(table.toString());
 };
@@ -85,6 +109,38 @@ const showStatus = (statusFiles) => {
 	console.log("WORKING DIR");
 	outputFiles(filterWTFiles(statusFiles));
 }
+
+const getWorkingDirFiles = statusFiles => {
+	return inquirer.prompt([
+		{
+			message: "Which file?",
+			// type: "list",
+			type: "checkbox",
+			name: "files",
+			choices: filterWTFiles(statusFiles).map(statusFile => ({
+				value: statusFile,
+				name: statusFile.path(),
+				short: statusFile.path(),
+			}))
+		}
+	]);
+}
+
+const getStagedFiles = statusFiles => {
+	return inquirer.prompt([
+		{
+			message: "Which file?",
+			// type: "list",
+			type: "checkbox",
+			name: "files",
+			choices: filterIndexedFiles(statusFiles).map(statusFile => ({
+				value: statusFile,
+				name: statusFile.path(),
+				short: statusFile.path(),
+			}))
+		}
+	]);
+};
 
 const deconstructArguments = () => {
 	const args = process.argv.slice(2);
@@ -152,52 +208,48 @@ async function main2() {
 	// console.log(commit.message());
 	
 	showStatus(statusFiles);
+	let action;
 
-	while(true) {
+	while(!action || action !== "exit") {
+		action = (await inquirer.prompt([{
+			message: "What do?",
+			type: 'list',
+			name: 'action',
+			choices: ["stage", "unstage", "commit", "status", "exit"]
+		}])).action;
+	
 		index = await repo.refreshIndex();
 		statusFiles = await repo.getStatusExt();
-
-		const { action } = await inquirer.prompt([
-			{
-				message: "What do?",
-				type: 'list',
-				name: 'action',
-				choices: ["add", "commit", "status"]
-			}
-		]);
 		
-		if (action === "status") {
-			showStatus(statusFiles);
-		} else if (action === "add") {
-			let { files } = await inquirer.prompt([
-				{
-					message: "Which file?",
-					type: "list",
-					// type: "checkbox",
-					name: "files",
-					choices: filterWTFiles(statusFiles).map(statusFile => ({
-						value: statusFile,
-						name: statusFile.path(),
-						short: statusFile.path(),
-					}))
-				}
-			]);
+		clearScreen();
+		showStatus(statusFiles);
+		
+		if (action === "stage") {
+			let { files } = await getWorkingDirFiles(statusFiles);
 			
-			if (typeof files !== 'array') {
-				files = [files];	
+			if (!Array.isArray(files)) {
+				files = [files];
 			}
 			
 			for(const statusFile of files) {
 				// const diff = statusFile.indexToWorkdir();
 				const result = await index.addByPath(statusFile.path());
-				// console.log("Added:", statusFile.path(), result);
-				
-				// commit -> getDiff -> patches -> hunks:ConvenientHunk[] -> lines:DiffLine[]
-				
+				// commit -> getDiff -> patches -> hunks:ConvenientHunk[] -> lines:DiffLine[]	
 				// await repo.stageLines(statusFile.path(), selectedDiffLines, false);
 			};
 			
-			// Both needed?
+			await index.write();
+		} else if (action === "unstage") {
+			let { files } = await getStagedFiles(statusFiles);
+			
+			if (!Array.isArray(files)) {
+				files = [files];
+			}
+			
+			for(const statusFile of files) {
+				const result = await index.removeByPath(statusFile.path());
+			};
+			
 			await index.write();
 		} else if (action === "commit") {
 			const oid = await index.writeTree();
@@ -229,6 +281,5 @@ async function main2() {
 	// - [ ] Can I commit line by line?
 }
 
-console.log("============ GIT GOOD ============");
 // main();
 main2();
