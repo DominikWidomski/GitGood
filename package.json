@@ -2,7 +2,9 @@
   "name": "gid",
   "version": "0.0.1",
   "description": "Git helper",
+  "preferGlobal": true,
   "main": "main.js",
+  "bin": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -17,6 +19,9 @@
     "simple-git": "^1.77.0"
   },
   "dependencies": {
+    "chalk": "^2.4.1",
+    "cli-table2": "^0.2.0",
+    "inquirer": "^5.2.0",
     "nodegit": "^0.22.0"
   }
 }
