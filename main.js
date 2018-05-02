@@ -5,19 +5,19 @@ const inquirer = require('inquirer');
 const readline = require('readline');
 
 // proxy clearScreenDown
-const _clearScreenDown = readline.clearScreenDown;
-readline.clearScreenDown = function(...args) {
-	_clearScreenDown(...args);
-}
+// const _clearScreenDown = readline.clearScreenDown;
+// readline.clearScreenDown = function (...args) {
+// 	_clearScreenDown(...args);
+// }
 
 process
-  .on('unhandledRejection', (reason, p) => {
-    console.error(reason, 'Unhandled Rejection at Promise', p);
-  })
-  .on('uncaughtException', err => {
-    console.error(err, 'Uncaught Exception thrown');
-    process.exit(1);
-  });
+	.on('unhandledRejection', (reason, p) => {
+		console.error(reason, 'Unhandled Rejection at Promise', p);
+	})
+	.on('uncaughtException', err => {
+		console.error(err, 'Uncaught Exception thrown');
+		process.exit(1);
+	});
 
 const rl = readline.createInterface({
 	input: process.stdin,
@@ -29,7 +29,7 @@ const clearScreen = () => {
 	// readline.moveCursor(rl, 0, -this.buffer.length);
 	readline.clearScreenDown(rl);
 };
-  
+
 /**
  * Objective:
  * I'd like to be able to see the history of a file, what lines were changed in which commit etc.
@@ -72,7 +72,7 @@ const mapStatus = status => ({
 const outputFiles = statusFiles => {
 	const head = ['status', 'file'];
 	const table = new Table({ head });
-	
+
 	if (statusFiles.length) {
 		statusFiles.forEach(statusFile => {
 			table.push([
@@ -86,7 +86,7 @@ const outputFiles = statusFiles => {
 			content: 'No files'
 		}])
 	}
-	
+
 	console.log(table.toString());
 };
 
@@ -170,7 +170,7 @@ async function main() {
 	const repo = Git(repos.justin)
 
 	let files = [];
-	repo.status(function(err, status) { 
+	repo.status(function (err, status) {
 		console.log('status:', status);
 
 		files = status.files;
@@ -182,7 +182,7 @@ async function main() {
 
 		repo.log({
 			file: filePath
-		}, function(err, log) {
+		}, function (err, log) {
 			console.log(log.latest);
 		})
 	});
@@ -207,47 +207,47 @@ async function main2() {
 
 	// console.log(branchRef);
 	// console.log(commit.message());
-	
+
 	showStatus(statusFiles);
 	let action;
 
-	while(!action || action !== "exit") {
+	while (!action || action !== "exit") {
 		action = (await inquirer.prompt([{
 			message: "What do?",
 			type: 'list',
 			name: 'action',
 			choices: ["stage", "unstage", "commit", "status", "exit"]
 		}])).action;
-	
+
 		index = await repo.refreshIndex();
 		statusFiles = await repo.getStatusExt();
-		
+
 		clearScreen();
 		showStatus(statusFiles);
-		
+
 		if (action === "stage") {
 			let { files } = await getWorkingDirFiles(statusFiles);
-			
+
 			if (!Array.isArray(files)) {
 				files = [files];
 			}
-			
-			for(const statusFile of files) {
+
+			for (const statusFile of files) {
 				// const diff = statusFile.indexToWorkdir();
 				const result = await index.addByPath(statusFile.path());
 				// commit -> getDiff -> patches -> hunks:ConvenientHunk[] -> lines:DiffLine[]	
 				// await repo.stageLines(statusFile.path(), selectedDiffLines, false);
 			};
-			
+
 			await index.write();
 		} else if (action === "unstage") {
 			let { files } = await getStagedFiles(statusFiles);
-			
+
 			if (!Array.isArray(files)) {
 				files = [files];
 			}
-			
-			for(const statusFile of files) {
+
+			for (const statusFile of files) {
 				const headRef = await nodegit.Reference.nameToId(repo, "HEAD");
 				const headCommit = await repo.getCommit(headRef);
 				const result = await nodegit.Reset.default(repo, headCommit, statusFile.path());
@@ -258,11 +258,11 @@ async function main2() {
 			const oid = await index.writeTree();
 			const headRef = await nodegit.Reference.nameToId(repo, "HEAD");
 			const headCommit = await repo.getCommit(headRef);
-			
+
 			const time = (new Date()).getTime();
 			var author = nodegit.Signature.create("Dominik Widomski", "dominik@digital-detox.co.uk", time, 60);
 			var committer = nodegit.Signature.create("Dominik Widomski", "dominik@digital-detox.co.uk", time, 90);
-			
+
 			const { message } = await inquirer.prompt({
 				type: 'editor',
 				message: 'Commit messsage',
@@ -272,17 +272,133 @@ async function main2() {
 			if (message.length === 0) {
 				throw new Error("Please provide a commit message");
 			}
-			
+
 			const commit = await repo.createCommit("HEAD", author, committer, message, oid, [headCommit]);
 		}
 	}
-		
-		// Questions
+
+	// Questions
 	// - [ ] Can I see what's in working dir / staging?
 	// - [ ] Can I see that line by line?
 	// - [ ] Can I see when those things were last modified?
 	// - [ ] Can I commit line by line?
 }
 
+/**
+ * https://stackoverflow.com/questions/5006821/nodejs-how-to-read-keystrokes-from-stdin#
+ * https://stackoverflow.com/questions/10585683/how-do-you-edit-existing-text-and-move-the-cursor-around-in-the-terminal/10830168#10830168
+ */
+async function main3() {
+	const readline = require('readline');
+	var stdin = process.stdin;
+	// stdin.setRawMode(true);
+	// stdin.setEncoding('utf8');
+
+	var rl = readline.createInterface({
+		input: process.stdin,
+		output: process.stdout,
+		terminal: false
+	});
+
+	rl.on('line', (input) => {
+		console.log('RL input', input);
+	});
+
+	stdin.on('data', function (key) {
+		// ctrl-c ( end of text )
+		if (key === '\u0003') {
+			// process.exit();
+		}
+		// write the key to stdout all normal like
+		process.stdout.write(key);
+	});
+
+	stdin.on('keypress', function (chunk, key) {
+		process.stdout.write('Get Chunk: ' + chunk + '\n');
+		// if (key && key.ctrl && key.name == 'c') process.exit();
+	});
+
+	stdin.resume();
+}
+
+async function main4() {
+	const readline = require('readline');
+	process.stdin.setRawMode(true);
+	process.stdin.setEncoding('utf8');
+
+	let muted = true;
+
+	const _write = process.stdout.write;
+	process.stdout.write = function (chunk) {
+		if (!muted) {
+			_write.call(process.stdout, chunk + "\n", 'utf8');
+		}
+
+		// process.stdout.emit('data', chunk);
+	}
+
+	var rl = readline.createInterface({
+		input: process.stdin,
+		output: process.stdout,
+		terminal: true
+	});
+
+	// var cliCursor = require('cli-cursor');
+	// cliCursor.hide();
+
+	// var cliWidth = require('cli-width');
+
+	const n = 3;
+	let focused = 0;
+	const items = Array(n).fill('item').map((item, index) => `${item} ${index}`);
+
+	rl.input.on('keypress', (char, key) => {
+		// process.stdout.write(`input keydown ${char} ${key}`);
+		analyseInput(char, key);
+	});
+
+	rl.input.on('data', (char, key) => {
+		// process.stdout.write(`input data ${char} ${key}`);
+		// analyseInput(char, key);
+	});
+
+	// rl.output.on('data', (chunk) => {
+	// 	process.stdout.write(`output data: ${chunk}`);
+	// });
+
+	function analyseInput(chunk, key) {
+		if (key.name === 'down') {
+			focused = (focused + 1) % n;
+		}
+		if (key.name === 'up') {
+			focused = (focused - 1);
+			if (focused < 0) {
+				focused += n;
+			}
+		}
+		render();
+	}
+	
+	function render() {
+		muted = false;
+
+		readline.cursorTo(rl, 0, 0);
+		// readline.moveCursor(rl, 0, -items.length);
+		readline.clearScreenDown(rl);
+		
+		let buffer = items.map((item, index) => {
+			return index === focused ? `> ${item}` : `  ${item}`;
+		}).join('\n');
+
+		process.stdout.write(buffer);
+		
+		muted = true;
+	}
+
+	render();
+}
+
 // main();
-main2();
+// main2();
+// main3();
+main4();
