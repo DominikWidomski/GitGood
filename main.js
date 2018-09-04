@@ -216,7 +216,7 @@ async function main2() {
 			message: "What do?",
 			type: 'list',
 			name: 'action',
-			choices: ["stage", "unstage", "commit", "status", "exit"]
+			choices: ["stage", "unstage", "commit", "auto-fixup", "status", "exit"]
 		}])).action;
 
 		index = await repo.refreshIndex();
@@ -274,6 +274,8 @@ async function main2() {
 			}
 
 			const commit = await repo.createCommit("HEAD", author, committer, message, oid, [headCommit]);
+		} else if (action === "auto-fixup") {
+			// TODO
 		}
 	}
 
@@ -322,6 +324,7 @@ async function main3() {
 }
 
 async function main4() {
+	const chalk = require('chalk');
 	const readline = require('readline');
 	process.stdin.setRawMode(true);
 	process.stdin.setEncoding('utf8');
@@ -343,12 +346,13 @@ async function main4() {
 		terminal: true
 	});
 
-	// var cliCursor = require('cli-cursor');
-	// cliCursor.hide();
+	// figure out what this is doing:
+	var cliCursor = require('cli-cursor');
+	cliCursor.hide();
 
 	// var cliWidth = require('cli-width');
 
-	const n = 3;
+	const n = 10;
 	let focused = 0;
 	const items = Array(n).fill('item').map((item, index) => `${item} ${index}`);
 
@@ -366,6 +370,14 @@ async function main4() {
 	// 	process.stdout.write(`output data: ${chunk}`);
 	// });
 
+	/**
+	 * Clears the output on launch
+	 */
+	function prepareOutput(rl) {
+		readline.cursorTo(rl, 0, 0);
+		readline.clearScreenDown(rl);
+	}
+
 	function analyseInput(chunk, key) {
 		if (key.name === 'down') {
 			focused = (focused + 1) % n;
@@ -382,8 +394,8 @@ async function main4() {
 	function render() {
 		muted = false;
 
-		readline.cursorTo(rl, 0, 0);
-		// readline.moveCursor(rl, 0, -items.length);
+		// readline.cursorTo(rl, 0, 0);
+		readline.moveCursor(rl, 0, -(items.length + 2));
 		readline.clearScreenDown(rl);
 		
 		let buffer = items.map((item, index) => {
@@ -395,10 +407,86 @@ async function main4() {
 		muted = true;
 	}
 
+	prepareOutput(rl);
 	render();
+
+	// TODO: output some lines and clear a few one by one
+}
+
+async function main5() {
+	const chalk = require('chalk');
+	const readline = require('readline');
+	process.stdin.setRawMode(true);
+	process.stdin.setEncoding('utf8');
+
+	let muted = true;
+
+	const _write = process.stdout.write;
+	process.stdout.write = function (chunk) {
+		if (!muted) {
+			_write.call(process.stdout, chunk, 'utf8');
+		}
+	}
+
+	var rl = readline.createInterface({
+		input: process.stdin,
+		output: process.stdout,
+		terminal: true
+	});
+
+	const n = 10;
+	let focused = 0;
+	const items = Array(n).fill('item').map((item, index) => `${item} ${index}`);
+
+	rl.input.on('keypress', (char, key) => {
+		if (key.name === 'space') {
+			render();
+		}
+	});
+
+	/**
+	 * Clears the output on launch
+	 */
+	function prepareOutput(rl) {
+		readline.cursorTo(rl, 0, 0);
+		readline.clearScreenDown(rl);
+		render([
+			'line 0',
+			'line 1',
+			'line 2',
+			'line 3',
+			'line 4',
+			'line 5',
+			'line 6',
+			'line 7',
+			'line 8',
+			'line 9',
+		].join('\n'));
+	}
+	
+	function render(buffer) {
+		muted = false;
+
+		// readline.cursorTo(rl, 0, 0);
+		readline.moveCursor(rl, 0, -3);
+		// readline.clearScreenDown(rl);
+		
+		buffer = buffer || [
+			'\nreplaced one',
+			'\nreplaced two'
+		].join('');
+
+		process.stdout.write(buffer);
+		
+		muted = true;
+	}
+
+	prepareOutput(rl);
+	// render();
 }
 
 // main();
 // main2();
 // main3();
-main4();
+// main4();
+main5();
