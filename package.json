@@ -8,11 +8,10 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [
-    "git",
-    "helper",
-    "node"
-  ],
+  "keywords": ["git", "helper", "node"],
+  "engines": {
+    "node": "8"
+  },
   "author": "Dominik Widomski",
   "license": "MIT",
   "devDependencies": {
