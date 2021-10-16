@@ -326,6 +326,8 @@ async function main4() {
 	process.stdin.setRawMode(true);
 	process.stdin.setEncoding('utf8');
 
+	console.log("test");
+
 	let muted = true;
 
 	const _write = process.stdout.write;
