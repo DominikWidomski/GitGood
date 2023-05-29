@@ -15,6 +15,9 @@
   ],
   "author": "Dominik Widomski",
   "license": "MIT",
+  "engines": {
+    "node": "14"
+  },
   "devDependencies": {
     "simple-git": "^1.77.0"
   },
@@ -22,6 +25,6 @@
     "chalk": "^2.4.1",
     "cli-table2": "^0.2.0",
     "inquirer": "^5.2.0",
-    "nodegit": "^0.22.0"
+    "nodegit": "0.27.0"
   }
 }
