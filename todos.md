@@ -8,3 +8,4 @@
 
 ## Features
 - [ ] add a simple rebase function
+  - [ ] There's a test repo next to this project's repo

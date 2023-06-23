@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+const path = require('path');
 const Table = require('cli-table2');
 const inquirer = require('inquirer');
 const readline = require('readline');
@@ -70,14 +71,24 @@ const mapStatus = status => ({
 }[status]);
 
 const outputFiles = statusFiles => {
-	const head = ['status', 'file'];
+	const head = ['status', 'file', 'flags, nfiles, similarity, status'];
 	const table = new Table({ head });
+
+	const headToIndex = (statusFile) => Object.values({
+		flags: statusFile.headToIndex()?.flags(),
+		// newFile: statusFile.headToIndex()?.newFile(),
+		nfiles: statusFile.headToIndex()?.nfiles(),
+		// oldFile: statusFile.headToIndex()?.oldFile(),
+		similarity: statusFile.headToIndex()?.similarity(),
+		status: statusFile.headToIndex()?.status(),
+	}).join(', ');
 
 	if (statusFiles.length) {
 		statusFiles.forEach(statusFile => {
 			table.push([
 				mapStatus(statusFile.status()),
-				statusFile.path()
+				statusFile.path(),
+				headToIndex(statusFile)
 			]);
 		});
 	} else {
@@ -160,14 +171,25 @@ const Commit = nodegit.Commit;
 const repos = {
 	// self: __dirname,
 	self: process.cwd(),
-	iris: '/Users/dddom/Dev/iprimarycare/iris',
-	lbx: '/Users/dddom/Dev/lbx/lbx-alphapoint-client',
-	justin: '/Users/dddom/Dev/dominikwidomski/justin-bot'
+	testRepo: path.resolve("../testRepo")
+	// iris: '/Users/dddom/Dev/iprimarycare/iris',
+	// lbx: '/Users/dddom/Dev/lbx/lbx-alphapoint-client',
+	// justin: '/Users/dddom/Dev/dominikwidomski/justin-bot'
 }
 
-// Old main
+/**
+ * Gets Git repo information
+ */
 async function main() {
-	const repo = Git(repos.justin)
+	// const repo = Git(repos.justin)
+	const cwd = process.cwd();
+	console.log(`CWD: ${cwd}`);
+	const repo = Git(cwd);
+
+	let funcResolve;
+	const promise = new Promise(resolve => {
+		funcResolve = resolve;
+	})
 
 	let files = [];
 	repo.status(function (err, status) {
@@ -185,19 +207,25 @@ async function main() {
 		}, function (err, log) {
 			console.log(log.latest);
 		})
+
+		funcResolve?.();	
 	});
 
 	// console.log(repo.constructor.prototype.tags.toString());
+	return promise;
 }
 
+/**
+ * Displays current working directory status and provides some options
+ */
 async function main2() {
 	// Error handling, if no repo found
 	// Also, complains about refs/heads/master not found initially
 	// maybe a way of initialising the master branch if not there?
 	// console.log('Opening repo:', repos.self);
-	const repo = await nodegit.Repository.open(repos.self);
-	const currentBranchRef = await repo.getCurrentBranch();
-	const branchRef = await repo.getBranch(currentBranchRef);
+	const repo = await nodegit.Repository.open(repos.testRepo);
+	// const currentBranchRef = await repo.getCurrentBranch();
+	// const branchRef = await repo.getBranch(currentBranchRef);
 	let statusFiles = await repo.getStatusExt();
 	let index;
 
@@ -259,7 +287,9 @@ async function main2() {
 			const headRef = await nodegit.Reference.nameToId(repo, "HEAD");
 			const headCommit = await repo.getCommit(headRef);
 
-			const time = (new Date()).getTime();
+			// TODO: the time was wrong (was creating commits in the future? lol)
+			const time = (new Date()).getTime() / 1000;
+			// TODO: also, the last parameter is timezone offset, do I need it?
 			var author = nodegit.Signature.create("Dominik Widomski", "dominik@digital-detox.co.uk", time, 60);
 			var committer = nodegit.Signature.create("Dominik Widomski", "dominik@digital-detox.co.uk", time, 90);
 
@@ -287,6 +317,8 @@ async function main2() {
 /**
  * https://stackoverflow.com/questions/5006821/nodejs-how-to-read-keystrokes-from-stdin#
  * https://stackoverflow.com/questions/10585683/how-do-you-edit-existing-text-and-move-the-cursor-around-in-the-terminal/10830168#10830168
+ * 
+ * simple input/output test
  */
 async function main3() {
 	const readline = require('readline');
@@ -321,6 +353,9 @@ async function main3() {
 	stdin.resume();
 }
 
+/**
+ * Custom input/output interface test
+ */
 async function main4() {
 	const readline = require('readline');
 	process.stdin.setRawMode(true);
@@ -398,7 +433,97 @@ async function main4() {
 	render();
 }
 
-// main();
-// main2();
-// main3();
-main4();
+const rebase = async (rebaseOntoHash) => {
+	// get repo
+	const repo = await nodegit.Repository.open(repos.testRepo);
+	const currentBranch = await repo.getCurrentBranch();
+	const headCommit = await repo.getBranchCommit(currentBranch.name());
+	
+	console.log({ branchName: currentBranch.name(), commitSHA: headCommit.sha() });
+
+	// TODO: WTF Annotated commits, whatever the fuck else???
+	// get current commit
+	rebase = await nodegit.Rebase.init(repo, null, null, 'c6f0a4c5bb23c4652c3fc4958ea8f83a6a57d226');
+	// get the commit by the hash
+}
+
+const rebaseArgErrorMessage = (expectedIndex) => `
+
+Argument "--rebase" requires a value.
+Pass the hash of the commit to rebase on in the following argument.
+(expected in position ${expectedIndex})
+`;
+
+const { exec } = require("child_process");
+
+const runner = (options) => async (command) => {
+	return new Promise((resolve, reject) => {
+		exec(command, options, (error, stdout, stderr) => {
+			if (error) {
+				console.log(`error: \n${error.message}`);
+				reject();
+        return;
+			}
+			if (stderr) {
+				console.log(`stderr: \n${stderr}`);
+				reject();
+        return;
+			}
+			console.log(`$${command}: \n${stdout}`);
+			resolve(stdout);
+		});
+	})
+}
+
+const rebase2 = async (rebaseOntoHash) => {
+	const runCommand = runner({ cwd: repos.testRepo });
+
+	// const startingCWD = process.cwd();
+	// await runCommand(`cd ${repos.testRepo}`);
+	// const result = await runCommand("git stash -u");
+	// Otherwise it should say "No local changes to save"
+	// const stashed = result.startsWith('Saved working directory');
+	// await runCommand(`cd ${startingCWD}`);
+
+	// TODO: This might be easiest to have as a terminal alias basically or a bash function
+	await runCommand(`git -c sequence.editor=: rebase -i --autosquash --autostash ${rebaseOntoHash}^`);
+	
+	// if(stashed) {
+	// 	await runCommand('git stash pop');
+	// }
+}
+
+// TODO refactor, because we don't have top level async in node 14 (I think?)
+const MAIN_FUNC = async () => {
+	const args = process.argv.slice(2);
+
+	console.log("ARGUMENTS", args);
+
+	if(args.includes("--rebase")) {
+		const indexOfArg = args.indexOf("--rebase");
+		const argValue = args[indexOfArg + 1];
+
+		if(!argValue) {
+			throw new Error(rebaseArgErrorMessage(indexOfArg + 1));
+		}
+
+		// await rebase(argValue);
+		await rebase2(argValue);
+	}
+
+
+	if(args.includes("--info")) {
+		await main();
+	}
+
+	if(args.includes("--status")) {
+		await main2();
+	}
+
+	// main3();
+	// main4();
+
+	process.exit();
+}
+
+MAIN_FUNC();
